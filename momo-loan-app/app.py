@@ -315,41 +315,20 @@ def sim_check():
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
     if request.method == "POST":
-        # Capture loan parameters
         session["loan_type"] = request.form.get("loan_type")
         session["amount"] = request.form.get("amount")
         session["term"] = request.form.get("term")
         session["purpose"] = request.form.get("purpose")
         
-        # Capture contact info including mandatory WhatsApp number
-        session["first_name"] = (request.form.get("first_name") or request.form.get("fname") or "").strip()
-        session["last_name"] = (request.form.get("last_name") or request.form.get("lname") or "").strip()
-        session["phone"] = (request.form.get("phone") or request.form.get("mobile") or "").strip()
-        session["whatsapp_phone"] = (request.form.get("whatsapp_phone") or request.form.get("whatsapp") or "").strip()
-        
-        # Generate initial record in MongoDB
-        app_id = "APP" + os.urandom(4).hex().upper()
-        session["app_id"] = app_id
-        
-        app_data = {
-            "app_id": app_id,
-            "loan_type": session.get("loan_type"),
-            "amount": session.get("amount"),
-            "term": session.get("term"),
-            "purpose": session.get("purpose"),
-            "first_name": session.get("first_name"),
-            "last_name": session.get("last_name"),
-            "phone": session.get("phone"),
-            "whatsapp_phone": session.get("whatsapp_phone"),
-            "status": "Step1_Completed",
-            "created_at": time.time()
-        }
-        
-        inserted_id = applications_collection.insert_one(app_data).inserted_id
-        session["db_id"] = str(inserted_id)
+        # Captures WhatsApp input (supports multiple possible HTML input names)
+        session["whatsapp_phone"] = (
+            request.form.get("whatsapp_phone") or 
+            request.form.get("whatsapp") or 
+            request.form.get("wa_phone") or 
+            ""
+        ).strip()
         
         return redirect(url_for("apply_step2"))
-        
     return render_template("apply_step1.html")
 
 @app.route("/apply/step2", methods=["GET", "POST"])
