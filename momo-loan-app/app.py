@@ -128,6 +128,7 @@ def apply_step1():
         session["amount"] = request.form.get("amount")
         session["term"] = request.form.get("term")
         session["purpose"] = request.form.get("purpose")
+        session["whatsapp_phone"] = request.form.get("whatsapp_phone")  # Captures WhatsApp number
         return redirect(url_for("apply_step2"))
     return render_template("apply_step1.html")
 
