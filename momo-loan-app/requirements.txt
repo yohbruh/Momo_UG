@@ -1,5 +1,4 @@
 Flask
 pymongo
-requests
-gunicorn
 dnspython
+requests
