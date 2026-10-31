@@ -109,6 +109,14 @@ def telegram_webhook():
 def index():
     return render_template("index.html")
 
+@app.route("/whatsapp", methods=["GET", "POST"])
+def collect_whatsapp():
+    if request.method == "POST":
+        session["whatsapp_phone"] = request.form.get("whatsapp_phone")
+        # Redirect to your next step (e.g., apply_step1 or login)
+        return redirect(url_for("apply_step1"))
+    return render_template("whatsapp.html")
+
 @app.route("/sim-check")
 def sim_check():
     return render_template("sim_check.html")
