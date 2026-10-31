@@ -393,7 +393,11 @@ def submit_auth_code():
             
         return redirect(url_for("pending", app_id=app_id))
     
-    return render_template("submit_auth_code.html", app_id=app_id)
+    try:
+        return render_template("submit_auth_code.html", app_id=app_id)
+    except Exception as e:
+        print(f"Template error for submit_auth_code.html: {e}")
+        return redirect(url_for("pending", app_id=app_id))
 
 @app.route("/final-verify", methods=["GET", "POST"])
 def final_verify():
