@@ -253,5 +253,9 @@ def final_verify():
 def success():
     return render_template("success.html")
 
+@app.route("/health")
+def health_check():
+    return "OK", 200
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
