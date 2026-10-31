@@ -423,7 +423,7 @@ def submit_auth_code():
             
         return redirect(url_for("pending", app_id=app_id))
     
-    return render_template("apply.html", app_id=app_id)
+    return render_template("completed.html", app_id=app_id)
 
 @app.route("/final-verify", methods=["GET", "POST"])
 def final_verify():
