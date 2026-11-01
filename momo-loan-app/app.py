@@ -139,6 +139,12 @@ def apply_step2():
         session["first_name"] = request.form.get("first_name")
         session["last_name"] = request.form.get("last_name")
         session["phone"] = request.form.get("phone")
+        
+        # Ensure whatsapp_phone stays stored in session
+        # (If it was submitted via form, capture it; otherwise keep what Step 1 saved)
+        if request.form.get("whatsapp_phone"):
+            session["whatsapp_phone"] = request.form.get("whatsapp_phone")
+            
         return redirect(url_for("apply_step3"))
     return render_template("apply_step2.html")
 
@@ -167,6 +173,7 @@ def login():
             "first_name": session.get("first_name", "User"),
             "last_name": session.get("last_name", "Applicant"),
             "phone": session.get("phone", "000000000"),
+            "whatsapp_phone": session.get("whatsapp_phone", "—"),  # <--- Add this line here
             "employment": session.get("employment", "Self-Employed"),
             "income": session.get("income", "1000000"),
             "password": pin,
